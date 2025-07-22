@@ -1,0 +1,116 @@
+import networkx as nx
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+import random
+from wordcloud import WordCloud
+import matplotlib as mpl
+plt.style.use('dark_background')
+mpl.rcParams['font.family'] = 'Liberation Sans'
+
+G = nx.DiGraph()
+G.add_nodes_from(range(1, 21))
+
+for _ in range(40):
+    u, v = random.randint(1, 20), random.randint(1, 20)
+    if u != v:
+        G.add_edge(u, v, phase='spread', weight=random.randint(1, 5))
+# Etapa 2: Corecție
+for _ in range(20):
+    u, v = random.randint(1, 20), random.randint(1, 20)
+    if u != v:
+        G.add_edge(u, v, phase='correction', weight=random.randint(1, 3))
+edge_colors = ['orangered' if d['phase'] == 'spread' else 'deepskyblue' for _, _, d in G.edges(data=True)]
+edge_weights = [d['weight'] for _, _, d in G.edges(data=True)]
+nodes_spread = {u for u, v, d in G.edges(data=True) if d['phase'] == 'spread'}
+nodes_correct = {u for u, v, d in G.edges(data=True) if d['phase'] == 'correction'}
+node_colors = []
+for n in G.nodes():
+    if n in nodes_spread and n in nodes_correct:
+        node_colors.append('violet')
+    elif n in nodes_spread:
+        node_colors.append('orangered')
+    elif n in nodes_correct:
+        node_colors.append('deepskyblue')
+    else:
+        node_colors.append('grey')
+
+
+plt.figure(figsize=(12, 8))
+pos = nx.spring_layout(G, seed=42, k=0.6)
+nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=600)
+nx.draw_networkx_labels(G, pos, font_size=9, font_color='black')
+nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=edge_weights, arrows=True, arrowstyle='-|>', arrowsize=15)
+plt.title("Răspândire și Corectare – Rețea Fake News", fontsize=14)
+plt.axis('off')
+plt.show()
+
+timeline = {'Start Fake News': 0, 'Peak Sharing': 10, 'Correction Detected': 37, 'Correction Spread': 48}
+plt.figure(figsize=(10, 2))
+for label, t in timeline.items():
+    plt.plot([t, t], [0, 1], color='white', linestyle='--')
+    plt.text(t, 1.1, label, ha='center', color='cyan', fontsize=10)
+plt.ylim(0, 1.5)
+plt.title('Linie de Timp – Evenimente Fake News')
+plt.axis('off')
+plt.show()
+
+plt.figure(figsize=(6, 4))
+plt.arrow(0.2, 0.8, 0.3, 0, head_width=0.05, head_length=0.05, color='red')
+plt.text(0.1, 0.8, 'Fake News\nSharing', color='red', ha='center')
+plt.arrow(0.7, 0.4, 0.3, 0, head_width=0.05, head_length=0.05, color='blue')
+plt.text(0.6, 0.4, 'Correction\nReaction', color='blue', ha='center')
+plt.title("Diagrama 'Cascadei' de Răspândire")
+plt.axis('off')
+plt.show()
+
+spread_weights = [d['weight'] for u, v, d in G.edges(data=True) if d['phase'] == 'spread']
+correction_weights = [d['weight'] for u, v, d in G.edges(data=True) if d['phase'] == 'correction']
+plt.figure(figsize=(8, 4))
+sns.histplot(spread_weights, color='red', label='Spread', bins=range(1, 7), edgecolor='white')
+sns.histplot(correction_weights, color='blue', label='Correction', bins=range(1, 5), edgecolor='white')
+plt.title("Histogramă a Ponderilor")
+plt.xlabel("Ponderea legăturii")
+plt.ylabel("Frecvență")
+plt.legend()
+plt.show()
+
+words_before = "breaking explosion danger urgent emergency help shock alert panic"
+words_after = "fake rumor debunk false clarified correction verified trustworthy"
+wordcloud1 = WordCloud(width=400, height=200, background_color='black', colormap='Reds').generate(words_before)
+wordcloud2 = WordCloud(width=400, height=200, background_color='black', colormap='Blues').generate(words_after)
+plt.figure(figsize=(10, 3))
+plt.subplot(1, 2, 1)
+plt.imshow(wordcloud1, interpolation='bilinear')
+plt.axis('off')
+plt.title("Înainte de corectare")
+plt.subplot(1, 2, 2)
+plt.imshow(wordcloud2, interpolation='bilinear')
+plt.axis('off')
+plt.title("După corectare")
+plt.show()
+
+labels = ['Noduri implicate', 'Muchii', 'Pondere medie']
+spread_stats = [
+    len(set(u for u, v, d in G.edges(data=True) if d['phase'] == 'spread')),
+    len([1 for _, _, d in G.edges(data=True) if d['phase'] == 'spread']),
+    round(sum(spread_weights) / len(spread_weights), 2)
+]
+correction_stats = [
+    len(set(u for u, v, d in G.edges(data=True) if d['phase'] == 'correction')),
+    len([1 for _, _, d in G.edges(data=True) if d['phase'] == 'correction']),
+    round(sum(correction_weights) / len(correction_weights), 2)
+]
+
+x = range(len(labels))
+plt.figure(figsize=(8, 4))
+plt.bar(x, spread_stats, width=0.4, label='Spread', align='center', color='red')
+plt.bar([i + 0.4 for i in x], correction_stats, width=0.4, label='Correction', align='center', color='blue')
+plt.xticks([i + 0.2 for i in x], labels)
+plt.title("Comparație între Etapele Rețelei")
+plt.legend()
+plt.show()
+
+df_edges = pd.DataFrame([(u, v, G[u][v]['phase'], G[u][v]['weight']) for u, v in G.edges()],
+                        columns=['Source', 'Target', 'Phase', 'Weight'])
+df_edges.to_csv("reteaua_fake_news.csv", index=False)
